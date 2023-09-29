@@ -218,7 +218,7 @@ def get_values():
             #if count % 7 == 0:
             #    logout()
 
-            time.sleep(60)
+            time.sleep(58)
             continue
 
 
