@@ -152,7 +152,8 @@ def write_temperatures(values):
 
     file_handle = open(file_path, "a")
 
-    line = str(int(time.time()))
+    now = datetime.datetime.now()
+    line = now.strftime("%Y-%m-%d %H:%M:%S")
     for value in values:
         line += ', ' + str(value)
 
