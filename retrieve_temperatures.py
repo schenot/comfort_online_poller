@@ -190,8 +190,6 @@ def get_values():
 
         all_text += response.text
 
-        print(all_text)
-
         all_values=[]
         for key in ['val_002_00334', 'val_000_00442', 'val_000_00444', 'val_000_00445', 'val_000_00446']:
             # id="val_000_00446">36.2</span>
