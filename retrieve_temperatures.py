@@ -32,7 +32,7 @@ def add_secret(data):
     #        "email": "...",
     #        "password": "..."
     #    } 
-    file_path= os.getcwd() + '/login.secret.json'
+    file_path= os.path.dirname(__file__) + '/login.secret.json'
     file_handle = open(file_path)
     secrets = json.load(file_handle)
     data.update(secrets)
@@ -148,7 +148,7 @@ def logout():
 
 def write_temperatures(values):
     today = datetime.datetime.today()
-    file_path = os.getcwd() + '/temp_' + str(today.isocalendar()[1]) + '.csv'
+    file_path = os.path.dirname(__file__) + '/temp_' + str(today.isocalendar()[1]) + '.csv'
 
     file_handle = open(file_path, "a")
 
@@ -178,26 +178,42 @@ def get_values():
                 cookies=ALL_COOKIES,
                 )
         if response.status_code != 200:
-            sys.exit("Unable to get temp")
+            sys.exit("Unable to get tank temp")
 
-        tank_values=[]
-        for key in ['val_000_00442', 'val_000_00444', 'val_000_00445', 'val_000_00446']:
+        all_text = response.text
+
+        response = requests.get('https://comfort-online.com/fr/Measurand/Values?plant=AZE-11913&name=CC%201.1%20radiateurs%20maison-1_2',
+                cookies=ALL_COOKIES,
+                )
+        if response.status_code != 200:
+            sys.exit("Unable to get ext temp")
+
+        all_text += response.text
+
+        print(all_text)
+
+        all_values=[]
+        for key in ['val_002_00334', 'val_000_00442', 'val_000_00444', 'val_000_00445', 'val_000_00446']:
             # id="val_000_00446">36.2</span>
-            pattern = re.compile('id="' + key + '">(\d+\.?\d*)</span')
-            match = pattern.search(response.text)
+            pattern = re.compile('id="' + key + '">(\d+[,\.]?\d*)</span')
+            match = pattern.search(all_text)
             if match:
-#                temp_values[key]= match.group(1)
-                tank_values.append(float(match.group(1)))
+                # some temp avec "," as separator, some other avec "."
+                value = match.group(1)
+                value = value.replace(',', '.')
+                all_values.append(float(value))
             else:
                 print("No temp" + key + " re login")
                 break
         else:
             re_login=0
 
-            avg = sum(tank_values) / len(tank_values) 
-            tank_values.append(avg)
+            tank_values = all_values[1:5] 
 
-            write_temperatures(tank_values)
+            avg = sum(tank_values) / len(tank_values) 
+            all_values.append(avg)
+
+            write_temperatures(all_values)
 
             # to test reconnection
             #if count % 7 == 0:
