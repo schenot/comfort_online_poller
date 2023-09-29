@@ -1,12 +1,42 @@
+#!/usr/bin/python3
 
 
-
-import requests
+import fcntl
+import os
 import re
+import requests
 import sys
 import time
+import datetime
+import json
 
 ALL_COOKIES={}
+
+def lock_script(label="default"):
+    file = "/tmp/instance_" + label + ".lock"
+
+    if not os.path.exists(file):
+        create_file_handle = open(file, "w")
+        create_file_handle.close()
+
+    lock_file_pointer = os.open(file, os.O_WRONLY)
+    try:
+        fcntl.lockf(lock_file_pointer, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        sys.exit("Script is already running")
+
+
+def add_secret(data):
+    # expect somethinkg like
+    #    {
+    #        "email": "...",
+    #        "password": "..."
+    #    } 
+    file_path= os.getcwd() + '/login.secret.json'
+    file_handle = open(file_path)
+    secrets = json.load(file_handle)
+    data.update(secrets)
+    file_handle.close()
 
 def concat_cookies(response):
     for cookie in response.cookies:
@@ -52,8 +82,11 @@ def login():
 
     url = 'https://kwblogin.b2clogin.com/kwblogin.onmicrosoft.com/B2C_1_signinup/SelfAsserted?tx=' + trans_id + '&p=B2C_1_signinup'
 
+    data={'request_type': 'RESPONSE'}
+    add_secret(data)
+
     response = requests.post(url,
-            data={ 'request_type': 'RESPONSE', 'email': 'aze@chenot.me', 'password': 'eiGuTHa1kighoor'},
+            data=data,
             headers=headers,
             cookies=ALL_COOKIES,
             )
@@ -99,36 +132,83 @@ def login():
     print("Logged in")
 
 
+# for test purpose
+def logout():
+    print("Logout")
+    response = requests.post('https://comfort-online.com/fr/Account/LogOff',
+            cookies=ALL_COOKIES
+            )
+    print(response)
+    response = requests.post('https://comfort-online.com/Account/Signout',
+        cookies=ALL_COOKIES
+        )
+    print(response)
 
-def getValues():
+
+
+def write_temperatures(values):
+    today = datetime.datetime.today()
+    file_path = os.getcwd() + '/temp_' + str(today.isocalendar()[1]) + '.csv'
+
+    file_handle = open(file_path, "a")
+
+    line = str(int(time.time()))
+    for value in values:
+        line += ', ' + str(value)
+
+    print(line)
+
+    file_handle.write(line + "\n")
+    file_handle.close()
+
+def get_values():
     if len(ALL_COOKIES) == 0:
         print("Login...")
         login()
 
     count=0
+    re_login=0
     while True:
         count += 1
+
+        if re_login > 2:
+            sys.exit("Can't retrieve temp despite relogin")
+
         response = requests.get('https://comfort-online.com/',
                 cookies=ALL_COOKIES,
                 )
         if response.status_code != 200:
             sys.exit("Unable to get temp")
 
-        temp_values={}
+        tank_values=[]
         for key in ['val_000_00442', 'val_000_00444', 'val_000_00445', 'val_000_00446']:
             # id="val_000_00446">36.2</span>
             pattern = re.compile('id="' + key + '">(\d+\.?\d*)</span')
             match = pattern.search(response.text)
             if match:
-                temp_values[key]= match.group(1)
+#                temp_values[key]= match.group(1)
+                tank_values.append(float(match.group(1)))
             else:
-                sys.exit("No temp" + key)
+                print("No temp" + key + " re login")
+                break
+        else:
+            re_login=0
 
-        print(temp_values)
+            avg = sum(tank_values) / len(tank_values) 
+            tank_values.append(avg)
 
-        if (count % 2
+            write_temperatures(tank_values)
 
-        time.sleep(2)
+            # to test reconnection
+            #if count % 7 == 0:
+            #    logout()
+
+            time.sleep(60)
+            continue
 
 
-getValues()
+        login()
+        re_login += 1
+
+lock_script(label = 'retrieve_temperatures.py')
+get_values()
