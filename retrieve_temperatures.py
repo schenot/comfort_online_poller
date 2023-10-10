@@ -148,7 +148,7 @@ def logout():
 
 def write_temperatures(values):
     today = datetime.datetime.today()
-    file_path = os.path.dirname(__file__) + '/temp_' + str(today.isocalendar()[1]) + '.csv'
+    file_path = os.path.dirname(__file__) + '/temp_' + str(today.year) + '_' + str(today.isocalendar()[1]) + '.csv'
 
     file_handle = open(file_path, "a")
 
